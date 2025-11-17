@@ -140,6 +140,5 @@ CALL populate_diagnoses(3000);  -- Change diagnosis count
 - All dates are historical (2018-2024) to enable trend analysis
 
 ## 👤 Author
-
-Data Science Portfolio Project - Healthcare Analytics
-
+**Amir Hosein VALIZADEH**  
+📧 Email | 🔗 [GitHub](https://github.com/yourusername) | 💼 [LinkedIn](https://linkedin.com/in/yourprofile)
