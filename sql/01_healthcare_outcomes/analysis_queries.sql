@@ -1,4 +1,11 @@
--- Admissions per primary diagnosis with mortality rate
+/*
+ * Analysis Queries - Healthcare Outcomes Analysis
+ * Analytical queries for mortality rates, length of stay, readmissions, and hospital performance
+ * See README.md for full documentation and query explanations
+ */
+
+-- Query 1: Mortality rate by primary diagnosis
+-- Analyzes which conditions have the highest mortality rates using primary diagnoses only
 WITH primary_diag AS (
     SELECT
         d.admission_id,
@@ -20,7 +27,8 @@ GROUP BY p.icd_code
 ORDER BY mortality_rate_pct DESC;
 
 
--- Average length of stay (LOS) per hospital & diagnosis
+-- Query 2: Average length of stay by hospital and diagnosis
+-- Compares LOS across hospitals for the same primary diagnosis
 WITH primary_diag AS (
     SELECT
         d.admission_id,
@@ -38,7 +46,9 @@ GROUP BY a.hospital, p.icd_code
 ORDER BY avg_los_days DESC;
 
 
--- 30-day readmission rate per patient
+-- Query 3: 30-day readmission rate calculation
+-- Uses window functions to identify patients readmitted within 30 days of discharge
+-- CTE 1: Orders admissions chronologically per patient using ROW_NUMBER
 WITH ordered_adm AS(
 	SELECT
 		a.*,
@@ -48,6 +58,7 @@ WITH ordered_adm AS(
 		) AS rn
     FROM admissions a
 ),
+-- CTE 2: Pairs consecutive admissions to calculate days between discharge and next admission
 pairs AS (
 	SELECT
 		cur.patient_id,
@@ -69,7 +80,9 @@ SELECT
 FROM pairs;
 
 
--- View: latest admission per patient
+-- Query 4: View - Latest admission per patient
+-- Creates a reusable view showing the most recent admission for each patient
+-- Uses window function to rank admissions by date (most recent first)
 CREATE OR REPLACE VIEW v_latest_admission AS
 SELECT *
 FROM (
@@ -86,7 +99,8 @@ WHERE t.rn = 1;
 SELECT * FROM v_latest_admission;
 
 
--- Stored procedure: get summary by hospital
+-- Query 5: Stored procedure - Hospital performance summary
+-- Returns mortality statistics for a specific hospital (admission count, deaths, mortality rate)
 DELIMITER $$
 CREATE PROCEDURE sp_hospital_summary (IN p_hospital VARCHAR(100))
 BEGIN
@@ -104,4 +118,5 @@ BEGIN
 END$$
 DELIMITER ;
 
+-- Example: Get summary for a specific hospital
 CALL sp_hospital_summary('Hospital_6');
