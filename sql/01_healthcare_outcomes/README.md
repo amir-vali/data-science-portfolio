@@ -141,4 +141,4 @@ CALL populate_diagnoses(3000);  -- Change diagnosis count
 
 ## 👤 Author
 **Amir Hosein VALIZADEH**  
-📧 Email | 🔗 [GitHub](https://github.com/yourusername) | 💼 [LinkedIn](https://linkedin.com/in/yourprofile)
+🔗 [GitHub](https://github.com/amir-vali) | 💼 [LinkedIn](https://linkedin.com/in/amirvali)  |  📧 amir.mks [at] gmail [dot] com
