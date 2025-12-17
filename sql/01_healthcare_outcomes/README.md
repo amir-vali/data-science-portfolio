@@ -66,9 +66,13 @@ This project models a healthcare system with three core entities:
 - **Synthetic demographics**: Randomized patient ages and genders.
 - **Logically consistent admissions**: Admissions for the same patient are generated sequentially (no overlapping stays).
 - **Length of stay**: Randomized LOS (1–20 days).
-- **Outcomes**: Random assignment of Recovered / Readmitted / Deceased.
 - **Diagnoses**: Each admission has **exactly one primary diagnosis** plus optional secondary diagnoses.
+- **Outcomes**:
+   - `Deceased` is assigned during admission generation (rare event).
+   - `Readmitted` is derived afterward: an admission is labeled `Readmitted` if the same patient has a subsequent admission at any later time.
+   - Otherwise, the admission is labeled `Recovered`.
 
+   Note: The **30-day readmission KPI** is computed in `analysis_queries.sql` using the time gap between discharge and the next admission.
 
 ### Analysis Capabilities (`analysis_queries.sql`)
 1. **Mortality Analysis**: Mortality rates by primary diagnosis
