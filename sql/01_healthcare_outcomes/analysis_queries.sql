@@ -46,53 +46,49 @@ GROUP BY a.hospital, p.icd_code
 ORDER BY avg_los_days DESC;
 
 
--- Query 3: 30-day readmission rate calculation
--- Uses window functions to identify patients readmitted within 30 days of discharge
--- CTE 1: Orders admissions chronologically per patient using ROW_NUMBER
-WITH ordered_adm AS(
-	SELECT
-		a.*,
-		ROW_NUMBER() OVER (
-			PARTITION BY a.patient_id
-            ORDER BY a.admission_date
-		) AS rn
-    FROM admissions a
+-- Query 3: 30-day readmission and anytime readmission rates calculation
+-- Uses window functions to identify patients readmitted within 30 days of discharge and anytime after discharge
+WITH ordered_adm AS (
+  SELECT
+    a.*,
+    LEAD(admission_date) OVER (PARTITION BY patient_id ORDER BY admission_date) AS next_admission_date
+  FROM admissions a
 ),
--- CTE 2: Pairs consecutive admissions to calculate days between discharge and next admission
 pairs AS (
-	SELECT
-		cur.patient_id,
-		cur.admission_date AS index_admission,
-        nxt.admission_date AS next_admission,
-        DATEDIFF(nxt.admission_date, cur.discharge_date) AS days_between
-    FROM ordered_adm cur
-    LEFT JOIN ordered_adm nxt
-		ON cur.patient_id = nxt.patient_id
-		AND cur.rn + 1 = nxt.rn
+  SELECT
+    patient_id,
+    admission_id,
+    outcome,
+    discharge_date,
+    next_admission_date,
+    DATEDIFF(next_admission_date, discharge_date) AS days_between
+  FROM ordered_adm
 )
 SELECT
-	COUNT(*) AS index_admissions,
-    SUM(CASE WHEN days_between BETWEEN 0 AND 30 THEN 1 ELSE 0 END) AS readmission_30d,
-    ROUND(
-		100.0 * SUM(CASE WHEN days_between BETWEEN 0 AND 30 THEN 1 ELSE 0 END) / COUNT(*),
-        2
-	) AS readmission_rate_30d_pct
-FROM pairs;
+  COUNT(*) AS eligible_admissions,
+  SUM(CASE WHEN outcome = 'Readmitted' THEN 1 ELSE 0 END) AS readmitted_any_time,
+  SUM(CASE WHEN days_between BETWEEN 0 AND 30 THEN 1 ELSE 0 END) AS readmitted_30d,
+  ROUND(100.0 * SUM(CASE WHEN outcome = 'Readmitted' THEN 1 ELSE 0 END) / COUNT(*), 2) AS readmitted_any_time_pct,
+  ROUND(100.0 * SUM(CASE WHEN days_between BETWEEN 0 AND 30 THEN 1 ELSE 0 END) / COUNT(*), 2) AS readmitted_30d_pct
+FROM pairs
+WHERE outcome <> 'Deceased'
+  AND discharge_date IS NOT NULL
+  AND next_admission_date IS NOT NULL
+  AND days_between >= 0;
+
+
 
 
 -- Query 4: View - Latest admission per patient
 -- Creates a reusable view showing the most recent admission for each patient
 -- Uses window function to rank admissions by date (most recent first)
 CREATE OR REPLACE VIEW v_latest_admission AS
-SELECT *
+SELECT admission_id, patient_id, admission_date, discharge_date, outcome, hospital
 FROM (
-	SELECT
-		a.*,
-		ROW_NUMBER() OVER (
-			PARTITION BY patient_id
-			ORDER BY admission_date DESC
-		) AS rn
-	FROM admissions a
+  SELECT
+    a.*,
+    ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY admission_date DESC) AS rn
+  FROM admissions a
 ) t
 WHERE t.rn = 1;
 
@@ -101,6 +97,7 @@ SELECT * FROM v_latest_admission;
 
 -- Query 5: Stored procedure - Hospital performance summary
 -- Returns mortality statistics for a specific hospital (admission count, deaths, mortality rate)
+DROP PROCEDURE IF EXISTS sp_hospital_summary;
 DELIMITER $$
 CREATE PROCEDURE sp_hospital_summary (IN p_hospital VARCHAR(100))
 BEGIN

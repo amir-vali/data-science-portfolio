@@ -53,7 +53,7 @@ This project models a healthcare system with three core entities:
    The mock data generator creates:
    - 200 patients (ages 14-84, randomized demographics)
    - 600 admissions (~3 per patient on average)
-   - 1,200 diagnoses (~2 per admission on average)
+   - 1,200 diagnoses (~2 per admission on average, with exactly 1 primary diagnosis per admission)
 
 3. **Run analysis queries:**
    ```sql
@@ -63,11 +63,12 @@ This project models a healthcare system with three core entities:
 ## 📈 Key Features
 
 ### Data Generation (`populate_mock_data.sql`)
-- **Realistic demographics**: Randomized patient ages, genders, and birth dates
-- **Admission patterns**: 7 years of historical data (2018-2024), variable length of stay (0-20 days)
-- **Medical coding**: 10 common ICD-10 diagnosis codes across multiple specialties
-- **Outcome distribution**: Realistic distribution of Recovered, Readmitted, and Deceased outcomes
-- **Active admissions**: 15% of admissions have NULL discharge_date (simulating current patients)
+- **Synthetic demographics**: Randomized patient ages and genders.
+- **Logically consistent admissions**: Admissions for the same patient are generated sequentially (no overlapping stays).
+- **Length of stay**: Randomized LOS (1–20 days).
+- **Outcomes**: Random assignment of Recovered / Readmitted / Deceased.
+- **Diagnoses**: Each admission has **exactly one primary diagnosis** plus optional secondary diagnoses.
+
 
 ### Analysis Capabilities (`analysis_queries.sql`)
 1. **Mortality Analysis**: Mortality rates by primary diagnosis

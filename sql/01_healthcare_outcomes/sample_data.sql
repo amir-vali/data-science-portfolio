@@ -15,7 +15,7 @@ INSERT INTO patients (first_name, last_name, birth_date, gender) VALUES
 -- Sample admission records
 INSERT INTO admissions (patient_id, admission_date, discharge_date, outcome, hospital) VALUES
 (1, '2024-01-01', '2024-01-10', 'Recovered',  'General Hospital'),
-(1, '2024-02-05', '2024-02-12', 'Readmitted', 'General Hospital'),
+(1, '2024-02-05', '2024-02-12', 'Recovered', 'General Hospital'),
 (2, '2024-01-20', '2024-01-27', 'Recovered',  'City Clinic'),
 (3, '2024-01-10', '2024-01-25', 'Deceased',   'General Hospital'),
 (4, '2024-03-01', '2024-03-05', 'Recovered',  'City Clinic');
