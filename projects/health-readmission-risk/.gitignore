@@ -1,0 +1,24 @@
+﻿# Virtual env
+.venv/
+
+# Data (keep local)
+data/
+*.csv
+*.parquet
+*.feather
+*.db
+*.duckdb
+
+# MLflow
+mlruns/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+.vscode/

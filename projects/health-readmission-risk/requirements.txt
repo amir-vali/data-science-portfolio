@@ -1,0 +1,14 @@
+﻿numpy
+pandas
+scikit-learn
+matplotlib
+fastapi
+uvicorn[standard]
+pydantic
+mlflow
+streamlit
+duckdb
+sqlalchemy
+ipykernel
+jupyter
+pytest
