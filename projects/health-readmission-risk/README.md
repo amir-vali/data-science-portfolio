@@ -16,8 +16,9 @@ It is built as an end-to-end machine learning project: data ingestion + SQL anal
 python -m venv .venv
 # activate venv (see below)
 pip install -r requirements.txt
+```
 
-## Project structure
+## Next steps
 - Phase 1: Ingest dataset into DuckDB + SQL EDA notebook
 - Phase 2: Build sklearn Pipeline + CV + metrics
 - Phase 3: Interpretability + reporting
