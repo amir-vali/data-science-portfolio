@@ -54,45 +54,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 
+from custom_transformers import TopCategoryReducer
 
 DEFAULT_DB_PATH = Path("data/processed/readmission.duckdb")
 DEFAULT_TABLE = "encounters"
-
-
-class TopCategoryReducer(BaseEstimator, TransformerMixin):
-    """
-    Reduce high-cardinality categorical columns by keeping only the top-k most frequent categories.
-    All other categories are mapped to the string "Other".
-
-    This keeps one-hot dimensions manageable and improves stability for small categories.
-    """
-
-    def __init__(self, top_k: int = 30, other_label: str = "Other"):
-        self.top_k = top_k
-        self.other_label = other_label
-        self.keep_values_: Dict[str, set] = {}
-
-    def fit(self, X: pd.DataFrame, y=None):
-        if not isinstance(X, pd.DataFrame):
-            X = pd.DataFrame(X)
-
-        self.keep_values_ = {}
-        for col in X.columns:
-            vc = X[col].value_counts(dropna=True)
-            self.keep_values_[col] = set(vc.head(self.top_k).index.astype(str).tolist())
-        return self
-
-    def transform(self, X: pd.DataFrame):
-        if not isinstance(X, pd.DataFrame):
-            X = pd.DataFrame(X)
-
-        X_out = X.copy()
-        for col in X_out.columns:
-            keep = self.keep_values_.get(col, set())
-            s = X_out[col].astype("string")
-            mask = s.notna() & (~s.isin(list(keep)))
-            X_out.loc[mask, col] = self.other_label
-        return X_out
 
 
 @dataclass
