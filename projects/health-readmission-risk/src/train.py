@@ -36,11 +36,13 @@ from typing import Dict, List, Tuple
 
 import duckdb
 import joblib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, clone
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
@@ -48,13 +50,27 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay
 )
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 
 from custom_transformers import TopCategoryReducer
+
+# MLflow is optional. The script runs without it unless --mlflow is provided.
+try:
+    import mlflow
+    import mlflow.sklearn
+    from mlflow.models import infer_signature
+    from mlflow.tracking import MlflowClient
+except Exception:
+    mlflow = None
+    infer_signature = None
+    MlflowClient = None
+
 
 DEFAULT_DB_PATH = Path("data/processed/readmission.duckdb")
 DEFAULT_TABLE = "encounters"
@@ -111,7 +127,7 @@ def split_feature_types(X: pd.DataFrame) -> Tuple[List[str], List[str]]:
     return numeric_cols, categorical_cols
 
 
-def build_preprocessor(numeric_cols: List[str], categorical_cols: List[str]) -> ColumnTransformer:
+def build_preprocessor(numeric_cols: List[str], categorical_cols: List[str], top_k: int = 30) -> ColumnTransformer:
     """Build a ColumnTransformer for numeric + categorical preprocessing."""
     numeric_pipe = Pipeline(
         steps=[
@@ -122,7 +138,7 @@ def build_preprocessor(numeric_cols: List[str], categorical_cols: List[str]) -> 
 
     categorical_pipe = Pipeline(
         steps=[
-            ("reduce_cardinality", TopCategoryReducer(top_k=30)),
+            ("reduce_cardinality", TopCategoryReducer(top_k=top_k)),
             ("imputer", SimpleImputer(strategy="most_frequent")),
             ("onehot", OneHotEncoder(handle_unknown="ignore")),
         ]
@@ -273,6 +289,62 @@ def fit_final_model(estimator: BaseEstimator, X: pd.DataFrame, y: pd.Series, ran
     return pipe
 
 
+def fit_pipeline(estimator: BaseEstimator, X_train: pd.DataFrame, y_train: pd.Series, top_k: int = 30) -> Pipeline:
+    """Fit the full preprocessing+model pipeline on the provided split."""
+    numeric_cols, categorical_cols = split_feature_types(X_train)
+    preprocessor = build_preprocessor(numeric_cols, categorical_cols, top_k=top_k)
+
+    pipe = Pipeline(
+        steps=[
+            ("preprocess", preprocessor),
+            ("model", estimator),
+        ]
+    )
+    pipe.fit(X_train, y_train)
+    return pipe
+
+
+def _save_confusion_matrix_plot(y_true, y_pred, out_path, title: str) -> None:
+    """Save confusion matrix plot as a PNG."""
+    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["No <30d", "<30d"])
+    disp.plot(values_format="d")
+    plt.title(title)
+    plt.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_path, dpi=160)
+    plt.close()
+
+def _save_permutation_importance_plot(pipe, X_test, y_test, out_csv, out_png, top_k=20, n_repeats=5, random_state=42) -> None:
+    """Compute and save permutation importance (CSV + horizontal bar plot)."""
+    perm = permutation_importance(
+        pipe, X_test, y_test,
+        scoring="average_precision",
+        n_repeats=n_repeats,
+        random_state=random_state,
+        n_jobs=-1,
+    )
+
+    imp = pd.DataFrame({
+        "feature": X_test.columns,
+        "importance_mean": perm.importances_mean,
+        "importance_std": perm.importances_std,
+    }).sort_values("importance_mean", ascending=False)
+
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    imp.to_csv(out_csv, index=False)
+
+    imp_top = imp.head(top_k).iloc[::-1]
+    plt.figure(figsize=(8, 6))
+    plt.barh(imp_top["feature"], imp_top["importance_mean"], xerr=imp_top["importance_std"])
+    plt.xlabel("Decrease in Average Precision (PR-AUC) after permutation")
+    plt.title(f"Permutation importance (top {top_k})")
+    plt.tight_layout()
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_png, dpi=160)
+    plt.close()
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Phase 2 training script (CV + threshold selection).")
     p.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH, help="Path to DuckDB file.")
@@ -281,6 +353,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out-dir", type=Path, default=Path("artifacts"), help="Output directory for artifacts.")
     p.add_argument("--n-splits", type=int, default=5, help="Number of CV folds.")
     p.add_argument("--random-state", type=int, default=42, help="Random seed.")
+    p.add_argument("--mlflow", action="store_true", help="Enable MLflow tracking.")
+    p.add_argument("--experiment-name", type=str, default="health-readmission-risk", help="MLflow experiment name.")
+    p.add_argument("--tracking-uri", type=str, default="", help="Optional MLflow tracking URI.")
+
+    # Holdout + importance (for artifacts)
+    p.add_argument("--test-size", type=float, default=0.20, help="Holdout fraction used for plots/importance.")
+    p.add_argument("--top-k", type=int, default=30, help="Top categories to keep per categorical feature.")
+    p.add_argument("--recall-target", type=float, default=0.70, help="Recall target for threshold selection.")
+    p.add_argument("--perm-top-k", type=int, default=20, help="Top features shown in permutation importance plot.")
+    p.add_argument("--perm-repeats", type=int, default=5, help="Permutation repeats (higher is slower).")
     return p.parse_args()
 
 
@@ -291,13 +373,31 @@ def main() -> int:
     df = load_encounters(args.db_path, table=args.table)
     X, y = prepare_xy(df, target_col=args.target)
 
+    if args.mlflow:
+        if mlflow is None:
+            raise RuntimeError("MLflow is not installed. Install it with: pip install mlflow")
+        if args.tracking_uri:
+            mlflow.set_tracking_uri(args.tracking_uri)
+        mlflow.set_experiment(args.experiment_name)
+
+    # One holdout split for stable plots/importance (not used for choosing the winner)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=args.test_size, stratify=y, random_state=args.random_state
+    )
+
     models = build_models(random_state=args.random_state)
 
     results: List[CVResult] = []
     threshold_tables: Dict[str, pd.DataFrame] = {}
 
+    run_index = []  # to select the best run later
+
     for name, est in models.items():
         print(f"Evaluating model: {name}")
+        if args.mlflow:
+            mlflow.start_run(run_name=f"{name}_cv")
+
+        # 1) CV evaluation
         res, oof_proba, tbl = evaluate_model_cv(
             model_name=name,
             estimator=est,
@@ -308,6 +408,77 @@ def main() -> int:
         )
         results.append(res)
         threshold_tables[name] = tbl
+
+        # 2) Fit on holdout-train for plots/importance
+        pipe_holdout = fit_pipeline(estimator=clone(est), X_train=X_train, y_train=y_train, top_k=args.top_k)
+        proba_test = pipe_holdout.predict_proba(X_test)[:, 1]
+        pred_test = (proba_test >= res.threshold).astype(int)
+
+        # 3) Save artifacts to disk
+        model_art_dir = args.out_dir / "mlflow_artifacts" / name
+        model_art_dir.mkdir(parents=True, exist_ok=True)
+
+        threshold_csv = model_art_dir / "threshold_table.csv"
+        tbl.to_csv(threshold_csv, index=False)
+
+        cm_png = model_art_dir / "confusion_matrix.png"
+        _save_confusion_matrix_plot(
+            y_true=y_test.to_numpy(),
+            y_pred=pred_test,
+            out_path=cm_png,
+            title=f"Confusion matrix (holdout) - {name} @ threshold={res.threshold:.2f}",
+        )
+
+        imp_csv = model_art_dir / "permutation_importance.csv"
+        imp_png = model_art_dir / "permutation_importance.png"
+        _save_permutation_importance_plot(
+            pipe=pipe_holdout,
+            X_test=X_test,
+            y_test=y_test,
+            out_csv=imp_csv,
+            out_png=imp_png,
+            top_k=args.perm_top_k,
+            n_repeats=args.perm_repeats,
+            random_state=args.random_state,
+        )
+
+        if args.mlflow:
+            # Params
+            mlflow.log_params({
+                "model_name": name,
+                "model_class": est.__class__.__name__,
+                "n_splits": args.n_splits,
+                "top_k": args.top_k,
+                "recall_target": args.recall_target,
+                "test_size": args.test_size,
+                "perm_repeats": args.perm_repeats,
+                "n_rows": len(X),
+                "n_features_raw": X.shape[1],
+                "positive_rate": float(y.mean()),
+            })
+
+            # Metrics (CV = selection basis)
+            mlflow.log_metrics({
+                "cv_roc_auc": res.roc_auc,
+                "cv_pr_auc": res.pr_auc,
+                "cv_precision": res.precision,
+                "cv_recall": res.recall,
+                "cv_f1": res.f1,
+                "cv_threshold": res.threshold,
+            })
+
+            # Artifacts
+            mlflow.log_artifact(str(threshold_csv), artifact_path="artifacts")
+            mlflow.log_artifact(str(cm_png), artifact_path="artifacts")
+            mlflow.log_artifact(str(imp_csv), artifact_path="artifacts")
+            mlflow.log_artifact(str(imp_png), artifact_path="artifacts")
+
+            run_id = mlflow.active_run().info.run_id
+            mlflow.end_run()
+        else:
+            run_id = ""
+
+        run_index.append({"model_name": name, "run_id": run_id, "cv_pr_auc": res.pr_auc, "cv_roc_auc": res.roc_auc})
 
     df_results = pd.DataFrame([r.__dict__ for r in results]).sort_values(
         by=["pr_auc", "roc_auc"], ascending=False
@@ -329,6 +500,34 @@ def main() -> int:
 
     with open(args.out_dir / "threshold.json", "w", encoding="utf-8") as f:
         json.dump({"model_name": best_name, "threshold": best_threshold}, f, indent=2)
+
+    if args.mlflow:
+        best_name = df_results.iloc[0]["model_name"]
+        best_run_id = next((r["run_id"] for r in run_index if r["model_name"] == best_name), "")
+
+        if best_run_id:
+            client = MlflowClient()
+            client.set_tag(best_run_id, "selected_model", "true")
+            client.set_tag(best_run_id, "selection_metric", "cv_pr_auc")
+
+            # Re-open the best run and log the final model trained on ALL data
+            with mlflow.start_run(run_id=best_run_id):
+                try:
+                    signature = infer_signature(X.head(50), final_pipe.predict_proba(X.head(50))[:, 1])
+                except Exception:
+                    signature = None
+
+                mlflow.sklearn.log_model(
+                    sk_model=final_pipe,
+                    artifact_path="final_model",
+                    signature=signature,
+                    input_example=X.head(5),
+                )
+
+                mlflow.log_artifact(str(args.out_dir / "model.joblib"), artifact_path="exported")
+                mlflow.log_artifact(str(args.out_dir / "threshold.json"), artifact_path="exported")
+                mlflow.log_artifact(str(args.out_dir / "cv_results.csv"), artifact_path="exported")
+                mlflow.log_artifact(str(args.out_dir / "threshold_analysis.csv"), artifact_path="exported")
 
     print(f"\nSaved artifacts to: {args.out_dir.resolve()}")
     return 0
