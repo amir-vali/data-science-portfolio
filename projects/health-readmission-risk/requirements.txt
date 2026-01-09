@@ -12,3 +12,4 @@ sqlalchemy
 ipykernel
 jupyter
 pytest
+httpx
