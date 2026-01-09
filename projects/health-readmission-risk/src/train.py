@@ -222,6 +222,8 @@ def evaluate_model_cv(
     y: pd.Series,
     n_splits: int = 5,
     random_state: int = 42,
+    top_k: int = 30,
+    recall_target: float = 0.70,
 ) -> Tuple[CVResult, np.ndarray, pd.DataFrame]:
     """
     Evaluate a model using Stratified K-Fold CV.
@@ -233,7 +235,7 @@ def evaluate_model_cv(
     - precision/recall/F1 at selected threshold
     """
     numeric_cols, categorical_cols = split_feature_types(X)
-    preprocessor = build_preprocessor(numeric_cols, categorical_cols)
+    preprocessor = build_preprocessor(numeric_cols, categorical_cols, top_k=top_k)
 
     pipe = Pipeline(
         steps=[
@@ -256,7 +258,7 @@ def evaluate_model_cv(
     roc_auc = roc_auc_score(y, oof_proba)
     pr_auc = average_precision_score(y, oof_proba)
 
-    best_t, tbl = choose_threshold_by_policy(y_true=y.to_numpy(), y_proba=oof_proba, recall_target=0.70)
+    best_t, tbl = choose_threshold_by_policy(y_true=y.to_numpy(), y_proba=oof_proba, recall_target=recall_target)
 
     y_pred = (oof_proba >= best_t).astype(int)
     prec = precision_score(y, y_pred, zero_division=0)
@@ -275,10 +277,10 @@ def evaluate_model_cv(
     return res, oof_proba, tbl
 
 
-def fit_final_model(estimator: BaseEstimator, X: pd.DataFrame, y: pd.Series, random_state: int = 42) -> Pipeline:
+def fit_final_model(estimator: BaseEstimator, X: pd.DataFrame, y: pd.Series, top_k: int = 30, random_state: int = 42) -> Pipeline:
     """Fit the full preprocessing+model pipeline on all data."""
     numeric_cols, categorical_cols = split_feature_types(X)
-    preprocessor = build_preprocessor(numeric_cols, categorical_cols)
+    preprocessor = build_preprocessor(numeric_cols, categorical_cols, top_k=top_k)
     pipe = Pipeline(
         steps=[
             ("preprocess", preprocessor),
@@ -373,6 +375,13 @@ def main() -> int:
     df = load_encounters(args.db_path, table=args.table)
     X, y = prepare_xy(df, target_col=args.target)
 
+    # Save input schema for serving (FastAPI)
+    schema_path = args.out_dir / "feature_columns.json"
+    schema_path.write_text(
+        json.dumps({"columns": list(X.columns)}, indent=2),
+        encoding="utf-8",
+    )
+
     if args.mlflow:
         if mlflow is None:
             raise RuntimeError("MLflow is not installed. Install it with: pip install mlflow")
@@ -405,6 +414,8 @@ def main() -> int:
             y=y,
             n_splits=args.n_splits,
             random_state=args.random_state,
+            top_k=args.top_k,
+            recall_target=args.recall_target,
         )
         results.append(res)
         threshold_tables[name] = tbl
@@ -495,7 +506,7 @@ def main() -> int:
     threshold_tables[best_name].to_csv(args.out_dir / "threshold_analysis.csv", index=False)
 
     final_estimator = models[best_name]
-    final_pipe = fit_final_model(final_estimator, X, y, random_state=args.random_state)
+    final_pipe = fit_final_model(final_estimator, X, y, top_k=args.top_k, random_state=args.random_state)
     joblib.dump(final_pipe, args.out_dir / "model.joblib")
 
     with open(args.out_dir / "threshold.json", "w", encoding="utf-8") as f:
