@@ -13,3 +13,4 @@ ipykernel
 jupyter
 pytest
 httpx
+requests
