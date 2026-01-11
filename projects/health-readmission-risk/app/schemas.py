@@ -16,3 +16,11 @@ class PredictResponse(BaseModel):
     label: int
     threshold: float
     model_name: str
+
+
+class MetadataResponse(BaseModel):
+    model_name: str
+    threshold: float
+    n_features: int
+    feature_columns: list[str]  # Optional but useful for debugging/docs
+    
