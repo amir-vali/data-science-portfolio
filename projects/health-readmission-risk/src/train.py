@@ -58,7 +58,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 
-from custom_transformers import TopCategoryReducer
+from readmission_risk.custom_transformers import TopCategoryReducer
 
 # MLflow is optional. The script runs without it unless --mlflow is provided.
 try:
