@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import json
 import sys
 from dataclasses import dataclass
@@ -13,12 +14,14 @@ import requests
 import importlib
 
 
-# Local model loading is optional (lazy-loaded).
-import joblib  # noqa: E402
+# Feature flags (controlled by env vars)
+# - In Docker: set ENABLE_LOCAL_MODEL=0 to hide local mode and avoid joblib dependency
+# - In local dev: default is enabled
+ENABLE_LOCAL_MODEL = os.getenv("ENABLE_LOCAL_MODEL", "1").strip().lower() in {"1", "true", "yes", "y"}
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 ART_DIR = APP_ROOT / "artifacts"
-DEFAULT_API_URL = "http://127.0.0.1:8000"
+FASTAPI_BASE_URL_DEFAULT = os.getenv("FASTAPI_BASE_URL", "http://127.0.0.1:8000")
 
 
 @dataclass(frozen=True)
@@ -73,9 +76,35 @@ def load_runtime_config(art_dir: Path) -> RuntimeConfig:
     )
 
 
+def get_prediction_mode() -> str:
+    """Return the selected prediction mode, respecting Docker feature flags."""
+    st.sidebar.header("Settings")
+
+    st.sidebar.text_input("FastAPI base URL", value=FASTAPI_BASE_URL_DEFAULT, key="fastapi_base_url")
+
+    if ENABLE_LOCAL_MODEL:
+        mode = st.sidebar.radio(
+            "Prediction mode",
+            options=["Call FastAPI (recommended)", "Local model (no API)"],
+            index=0,
+        )
+        return mode
+
+    # Docker / API-only mode: do not show Local option at all
+    st.sidebar.radio(
+        "Prediction mode",
+        options=["Call FastAPI (recommended)"],
+        index=0,
+        disabled=True,
+    )
+    st.sidebar.caption("Local model is disabled in this Docker build.")
+    return "Call FastAPI (recommended)"
+
+
 @st.cache_resource(show_spinner=False)
 def load_local_model(model_path: Path) -> Any:
     """Load the joblib model only when needed (lazy-load)."""
+    import joblib  # lazy import to avoid dependency unless local mode is used
     if not model_path.exists():
         raise FileNotFoundError(f"Missing: {model_path}")
     ensure_unpickle_deps()
@@ -142,12 +171,8 @@ def main() -> None:
 
     # Sidebar configuration
     st.sidebar.header("Settings")
-    mode = st.sidebar.radio(
-        "Prediction mode",
-        ["Call FastAPI (recommended)", "Local model (no API)"],
-        index=0,
-    )
-    api_url = st.sidebar.text_input("FastAPI base URL", value=DEFAULT_API_URL)
+    mode = get_prediction_mode()
+    # api_url = st.sidebar.text_input("FastAPI base URL", value=FASTAPI_BASE_URL_DEFAULT)
 
     st.sidebar.markdown("---")
     st.sidebar.write("**Model**:", cfg.model_name)
