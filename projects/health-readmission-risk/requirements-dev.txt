@@ -1,0 +1,8 @@
+matplotlib
+duckdb
+sqlalchemy
+ipykernel
+jupyter
+pytest
+httpx
+mlflow
