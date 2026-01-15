@@ -1,0 +1,35 @@
+# Use a slim Python base image
+FROM python:3.11-slim
+
+# Prevent Python from writing .pyc files and enable unbuffered logs
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set workdir inside the container
+WORKDIR /app
+
+# System deps (minimal). Can be extended if needed later.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency file first (better Docker layer caching)
+COPY requirements-api.txt /app/requirements-api.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r /app/requirements-api.txt
+
+# Copy and install readmission-risk package (so unpickling works)
+COPY pyproject.toml /app/pyproject.toml
+COPY src /app/src
+RUN pip install --no-cache-dir -e .
+
+# Copy only what API needs
+COPY app /app/app
+COPY artifacts /app/artifacts
+
+# Expose FastAPI port
+EXPOSE 8000
+
+# Run the API with uvicorn
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
