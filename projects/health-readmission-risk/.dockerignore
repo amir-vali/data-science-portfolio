@@ -1,0 +1,36 @@
+# venv / caches
+.venv/
+__pycache__/
+*.pyc
+
+# MLflow local runs
+mlruns/
+mlflow.db
+
+# Data (keep local)
+data/
+*.csv
+*.parquet
+*.feather
+*.db
+*.duckdb
+
+# Notebooks / Jupyter
+notebooks/
+.ipynb_checkpoints/
+*.ipynb
+ipykernel
+jupyter
+
+# Tests/tools (not needed at runtime)
+tests/
+tools/
+
+# IDE/OS
+.vscode/
+.DS_Store
+
+# build artifacts
+*.egg-info/
+build/
+dist/
