@@ -63,7 +63,7 @@ def load_runtime_config(art_dir: Path) -> RuntimeConfig:
     feature_columns = list(cols_cfg["columns"])
 
     # Optional global explanation artifact (produced in Phase 4)
-    perm_csv = art_dir / "mlflow_artifacts" / model_name / "permutation_importance.csv"
+    perm_csv = art_dir / "reports" / model_name / "permutation_importance.csv"
     perm_df = None
     if perm_csv.exists():
         perm_df = pd.read_csv(perm_csv)
@@ -157,6 +157,13 @@ def predict_locally(model: Any, feature_columns: List[str], threshold: float, fe
     return {"probability": proba, "label": label, "threshold": threshold}
 
 
+def _normalize_api_url(url: str) -> str:
+
+    url = (url or "").strip()
+
+    return url[:-1] if url.endswith("/") else url
+
+
 def main() -> None:
     st.set_page_config(page_title="Readmission Risk Demo", layout="wide")
     st.title("Hospital Readmission Risk – Demo")
@@ -172,7 +179,7 @@ def main() -> None:
     # Sidebar configuration
     st.sidebar.header("Settings")
     mode = get_prediction_mode()
-    # api_url = st.sidebar.text_input("FastAPI base URL", value=FASTAPI_BASE_URL_DEFAULT)
+    api_url = _normalize_api_url(st.session_state.get("fastapi_base_url", FASTAPI_BASE_URL_DEFAULT))
 
     st.sidebar.markdown("---")
     st.sidebar.write("**Model**:", cfg.model_name)
@@ -351,7 +358,7 @@ def main() -> None:
             st.info(
                 "Permutation importance not found.\n\n"
                 "Expected path:\n"
-                f"{(ART_DIR / 'mlflow_artifacts' / cfg.model_name / 'permutation_importance.csv')}"
+                f"{(ART_DIR / 'reports' / cfg.model_name / 'permutation_importance.csv')}"
             )
         else:
             imp = cfg.perm_importance.sort_values("importance_mean", ascending=False).head(20)
