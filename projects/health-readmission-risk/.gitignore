@@ -3,15 +3,11 @@
 
 # Data (keep local)
 data/
-*.csv
-*.parquet
-*.feather
-*.db
-*.duckdb
 *.joblib
 
 # MLflow
 mlruns/
+mlflow.db
 
 # Python cache
 __pycache__/
