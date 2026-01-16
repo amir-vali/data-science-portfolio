@@ -426,7 +426,7 @@ def main() -> int:
         pred_test = (proba_test >= res.threshold).astype(int)
 
         # 3) Save artifacts to disk
-        model_art_dir = args.out_dir / "mlflow_artifacts" / name
+        model_art_dir = args.out_dir / "reports" / name
         model_art_dir.mkdir(parents=True, exist_ok=True)
 
         threshold_csv = model_art_dir / "threshold_table.csv"
