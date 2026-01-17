@@ -1,38 +1,42 @@
-# Data Science Portfolio (Evolving)
+# Data Science Portfolio
 
-This repository is an evolving, recruiter-oriented **data science portfolio**: multiple projects that demonstrate practical skills across machine learning, analytics, and production-style engineering (reproducibility, clean code organization, and deployable demos).
+A growing portfolio of end-to-end data projects across machine learning engineering, analytics, and reproducible experimentation. The focus is on production-minded workflows (clean structure, reproducibility, and clear documentation), and this repository can evolve over time as projects expand or new ones are added.
 
-## Projects
+## 📁 Projects
 
-- **Health Readmission Risk** — End-to-end ML project (ingestion → modeling → evaluation → MLflow tracking → FastAPI inference → Streamlit demo → Docker).
-  - Folder: `projects/health-readmission-risk`
-  - Start here: `projects/health-readmission-risk/README.md`
+### 🏥 Hospital Readmission Risk Prediction (End-to-End)
 
-- **Healthcare Outcomes (SQL)** — SQL data modeling + synthetic data generation + analysis queries.
-  - Folder: `projects/healthcare-outcomes`
-  - Start here: `projects/healthcare-outcomes/README.md`
+An end-to-end machine learning project that predicts hospital readmission risk from patient/hospital data and demonstrates an industry-style workflow: ingestion (DuckDB) → model training/evaluation → API (FastAPI) → demo UI (Streamlit) → experiment tracking (MLflow) → containerization (Docker).
 
-## What this portfolio emphasizes
+📌 Location: `projects/health-readmission-risk/`
 
-- Reproducible pipelines (scripts + clear run commands, not notebook-only)
-- Production-style separation (training vs serving vs UI)
-- Traceability (experiment tracking and exported artifacts)
-- Practical delivery (API contract, containerized run, minimal automated tests)
+### 📊 Healthcare Outcomes Analysis (SQL)
 
-## Repository layout
+A comprehensive SQL analytics project modeling a hospital domain (patients, admissions, diagnoses) and showcasing advanced SQL techniques (CTEs, window functions, stored procedures) for outcomes and readmission analysis.
 
-```text
-projects/
-  health-readmission-risk/
-  healthcare-outcomes/
-```
+📌 Location: `projects/healthcare-outcomes/`
 
-## How to review quickly
+## 🧰 Tech Stack
 
-1. Open the README of the project you care about.
-2. Skim **Architecture** and **How to run**.
-3. Optionally run the Docker demo to verify the end-to-end flow.
+- **Python**: data processing + modeling (scikit-learn), API (FastAPI), UI (Streamlit)
+- **SQL / DuckDB**: reproducible local analytics + feature preparation
+- **MLflow**: experiment tracking
+- **Docker / Docker Compose**: portable demo environment
 
-## About the author
+## 🚀 How to Use This Repository
 
-Amir Hosein (GitHub: `amir-vali`)
+Each project under `projects/` is self-contained and includes its own README with:
+
+- setup instructions
+- reproducibility steps
+- how to run demos (API/UI/Docker)
+
+Start here:
+
+1. Open the project folder under `projects/`
+2. Follow that project's README
+
+## 👤 Author
+
+**Amir Hosein VALIZADEH**  
+🔗 [GitHub](https://github.com/amir-vali) | 💼 [LinkedIn](https://linkedin.com/in/amirvali) | 📧 amir.mks [at] gmail [dot] com

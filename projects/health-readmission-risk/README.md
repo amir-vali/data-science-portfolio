@@ -1,23 +1,25 @@
 # Hospital Readmission Risk Prediction (End-to-End)
 
-Predict hospital readmission risk (e.g., within 30 days) using patient/encounter features.
+Predict hospital readmission risk (e.g., within 30 days) from patient/hospital data using a reproducible, portfolio-ready ML workflow.
 
-This project is intentionally designed as an **end-to-end, recruiter-friendly ML deliverable**:
+## 📊 Project Overview
 
-- Data ingestion into DuckDB for SQL-style exploration
-- A scikit-learn training pipeline with cross-validation and threshold selection
-- Evaluation artifacts (metrics + plots)
-- Optional experiment tracking with MLflow
-- A FastAPI inference service (typed request/response)
-- A Streamlit UI for interactive testing
-- Docker/Docker Compose for a one-command demo
+This project is structured as an end-to-end machine learning system:
 
-## Dataset
+- **Data ingestion** into a local **DuckDB** database
+- **SQL + EDA** notebooks for exploration and sanity checks
+- **scikit-learn Pipeline** training with cross-validation and threshold selection
+- **Reporting artifacts** (plots + CSVs) for interpretability
+- **FastAPI** inference service
+- **Streamlit** demo UI
+- **MLflow** experiment tracking (optional)
+- **Docker Compose** for a portable demo environment
 
-The ingestion script supports the public UCI dataset “Diabetes 130-US hospitals (1999–2008)”.
-Raw data is not committed to this repository.
+## 💾 Dataset
 
-## Architecture
+The ingestion script supports the public UCI dataset “Diabetes 130-US hospitals (1999–2008)”. Raw data is not committed to this repository.
+
+## 🏗️ Model & System Architecture
 
 ```text
              +-------------------+
@@ -39,29 +41,54 @@ Raw data is not committed to this repository.
   FastAPI API (/predict)        Streamlit UI (demo)
 ```
 
-## Project structure
+## 📁 Repository Structure
 
-- `src/data_ingest.py` — download/clean dataset and build DuckDB tables
-- `src/train.py` — training + CV + threshold policy + artifact export (+ optional MLflow)
-- `app/` — FastAPI service (loads exported artifacts)
-- `ui/` — Streamlit demo (API mode; optional local-model mode)
-- `notebooks/` — EDA / modeling / evaluation notebooks
-- `artifacts/` — exported schema/threshold/model and evaluation outputs
-- `docker-compose.yml` / `Dockerfile.*` — containerized demo
+- `notebooks/` : EDA + SQL exploration + modeling notebooks
+- `src/`       : reproducible training / evaluation pipeline
+    - `data_ingest.py` — download, clean dataset, build DuckDB tables
+    - `train.py`       — training + CV + threshold policy + artifact export
+- `app/`       : FastAPI inference service (loads exported artifacts)
+- `ui/`        : Streamlit demo UI (API mode; optional local-model mode)
+- `data/`      : local-only data (ignored by git)
+- `artifacts/` : exported artifacts (threshold/schema are versioned; model is reproduced locally)
+- `docker-compose.yml` — containerized demo (API + UI)
 
-## Run locally
+## 🚀 Quick Start (Local)
 
-### 0) Create a virtual environment
+### Prerequisites
+
+- Python 3.10+ (recommended)
+
+### 1) Create and activate a virtual environment
 
 ```bash
 python -m venv .venv
-# Windows (PowerShell): .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
 ```
 
-### 1) Install dependencies
+Windows (PowerShell):
 
-For development (EDA + training + MLflow + tests):
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+### 2) Install dependencies
+
+#### Option A — Quick start (recommended for local development)
+Install everything (API + UI + notebooks + dev tools) in one go:
+
+```bash
+pip install -r requirements.txt
+pip install -e .
+```
+
+#### Option B — Minimal installs (recommended for production/Docker)
+Use the split requirement files to keep environments lightweight:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -70,18 +97,26 @@ pip install -r requirements-ui.txt
 pip install -e .
 ```
 
-`pip install -e .` is important so that `readmission_risk.custom_transformers` is importable when
-loading the exported `model.joblib`.
+#### Why multiple requirements files?
 
-### 2) Ingest data (build DuckDB)
+- `requirements.txt`: convenience (everything installed) for local exploration and quick setup. 
+- `requirements-api.txt`: minimal runtime for the API container. 
+- `requirements-ui.txt`: minimal runtime for Streamlit container. 
+- `requirements-dev.txt`: extra tooling used during development (notebooks/tests/EDA/tracking). 
+
+`pip install -e .` is important so that `readmission_risk.custom_transformers` is importable when loading the exported `model.joblib`.
+
+### 3) Ingest data into DuckDB
 
 ```bash
 python src/data_ingest.py --download
 ```
 
-This creates a DuckDB database (default): `data/processed/readmission.duckdb`.
+This produces DuckDB database (locally):
 
-### 3) Train and export artifacts
+- `data/processed/readmission.duckdb`
+
+### 4) Train and export artifacts
 
 ```bash
 python src/train.py --db-path data/processed/readmission.duckdb --out-dir artifacts
@@ -99,19 +134,15 @@ This step exports evaluation artifacts and (optionally) a trained model.
 **Non-versioned artifact (not committed due to size):**
 - `artifacts/model.joblib`
 
-**Model artifact policy**  
+#### Model artifact policy
+
 The trained model (`model.joblib`) is intentionally **not versioned in Git** due to its large size (~670 MB).
 This project follows common industry practice: source code and configurations are version-controlled, while large
 binary artifacts are reproducible rather than stored in Git history.
 
-To reproduce the model locally:
+## 🧪 Run the Services (Local)
 
-```bash
-python src/data_ingest.py --download
-python src/train.py --db-path data/processed/readmission.duckdb --out-dir artifacts
-```
-
-### 4) Run the API
+### FastAPI
 
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -129,7 +160,7 @@ Predict (example):
 curl -X POST http://127.0.0.1:8000/predict   -H "Content-Type: application/json"   -d '{"features": {"time_in_hospital": 3, "num_lab_procedures": 42, "num_medications": 10}}'
 ```
 
-### 5) Run the Streamlit UI
+### Streamlit
 
 ```bash
 streamlit run ui/streamlit_app.py
@@ -139,7 +170,27 @@ The UI supports:
 - **API mode** (recommended): UI → FastAPI → model
 - **Local mode** (optional): UI loads `model.joblib` directly (useful for offline demos)
 
-## MLflow (optional)
+In the sidebar, set **FastAPI base URL** (default is `http://127.0.0.1:8000`).
+
+## 🐳 Docker (Portable Demo)
+
+Build and run:
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- FastAPI: `http://localhost:8000`
+- Streamlit UI: `http://localhost:8501`
+- MLflow (optional): `http://localhost:5000`
+
+📌 Note: the API requires `artifacts/model.joblib`. If you have not trained the model yet, run the training step first (see **Train and export artifacts**).
+
+## 📈 MLflow (Optional)
+
+Training can log runs to MLflow for experiment tracking:
 
 ### Option A: Start MLflow via Docker
 
@@ -159,27 +210,21 @@ python src/train.py --out-dir artifacts --mlflow --tracking-uri http://127.0.0.1
 mlflow ui
 ```
 
-## Docker demo
-
-From `projects/health-readmission-risk/`:
-
 ```bash
-docker compose up --build
+python src/train.py --db-path data/processed/readmission.duckdb --out-dir artifacts --mlflow
 ```
 
-Services:
-- API: `http://localhost:8000`
-- UI: `http://localhost:8501`
-- MLflow (optional): `http://localhost:5000`
+Note: If `--tracking-uri` is not provided, MLflow defaults to the local file-based backend.
 
-## Tests
+## 🧾 Notes
 
-```bash
-pytest -q
-```
+- This is a portfolio / research project, **not** clinical decision support software.
+- Any claims about generalization, fairness, or safety require domain-specific validation.
+- The dataset is public; **raw data is not committed** to this repository.
+- `data/` is ignored by git and intended for local use only.
+- Only small artifacts required for the UI (e.g., schema, thresholds) are versioned.
+- Large model binaries are **reproduced locally**, not stored in the repository.
 
-## Notes and limitations
+## 👤 Author
 
-- This is a portfolio project, not clinical decision support software.
-- Any claims about generalization, fairness, or safety require domain validation.
-- The dataset is public; raw data is not committed to this repository.
+Amir Hosein

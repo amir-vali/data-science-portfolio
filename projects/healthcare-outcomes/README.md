@@ -145,5 +145,4 @@ CALL populate_diagnoses(3000);  -- Change diagnosis count
 - All dates are historical (2018-2024) to enable trend analysis
 
 ## 👤 Author
-**Amir Hosein VALIZADEH**  
-🔗 [GitHub](https://github.com/amir-vali) | 💼 [LinkedIn](https://linkedin.com/in/amirvali)  |  📧 amir.mks [at] gmail [dot] com
+Amir Hosein
